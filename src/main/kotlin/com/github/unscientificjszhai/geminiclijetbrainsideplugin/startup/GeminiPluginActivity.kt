@@ -1,12 +1,14 @@
 package com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup
 
+import com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp.McpServer
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 
-class MyProjectActivity : ProjectActivity {
+class GeminiPluginActivity : ProjectActivity {
 
     override suspend fun execute(project: Project) {
-        thisLogger().warn("Don't forget to remove all non-needed sample code files with their corresponding registration entries in `plugin.xml`.")
+        thisLogger().warn("GeminiPluginActivity ${project.name}")
+        project.getService(McpServer::class.java).start()
     }
 }

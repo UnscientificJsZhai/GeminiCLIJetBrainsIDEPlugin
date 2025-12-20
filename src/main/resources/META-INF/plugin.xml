@@ -5,11 +5,17 @@
     <vendor>unscientificjszhai</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
+    <depends>org.jetbrains.plugins.terminal</depends>
+
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.unscientificjszhai.geminiclijetbrainsideplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.MyProjectActivity" />
+        <postStartupActivity implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.GeminiPluginActivity" />
+    </extensions>
+
+    <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
+        <localTerminalCustomizer implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.terminal.GeminiTerminalCustomizer"/>
     </extensions>
 </idea-plugin>
