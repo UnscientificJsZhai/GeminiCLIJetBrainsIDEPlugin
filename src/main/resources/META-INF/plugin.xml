@@ -1,15 +1,13 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.unscientificjszhai.geminiclijetbrainsideplugin</id>
-    <name>GeminiCLIunscientificjszhaiIDEPlugin</name>
+    <name>Gemini CLI Companion by UnscientificJsZhai</name>
     <vendor>unscientificjszhai</vendor>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
-
-    <depends>org.jetbrains.plugins.terminal</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <postStartupActivity implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.GeminiPluginActivity" />
