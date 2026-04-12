@@ -8,7 +8,6 @@ import com.intellij.openapi.startup.ProjectActivity
 class GeminiPluginActivity : ProjectActivity {
 
     override suspend fun execute(project: Project) {
-        thisLogger().warn("GeminiPluginActivity ${project.name}")
         project.getService(McpServer::class.java).start()
     }
 }

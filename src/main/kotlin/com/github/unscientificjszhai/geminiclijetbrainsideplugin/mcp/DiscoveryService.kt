@@ -3,6 +3,7 @@ package com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp
 import com.github.unscientificjszhai.geminiclijetbrainsideplugin.model.DiscoveryInfo
 import com.github.unscientificjszhai.geminiclijetbrainsideplugin.model.IdeInfo
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
@@ -53,7 +54,7 @@ class DiscoveryService(private val project: Project) : Disposable {
             port = port,
             workspacePath = workspacePath,
             authToken = authToken,
-            ideInfo = IdeInfo("jetbrains", "JetBrains IDE")
+            ideInfo = ApplicationInfo.getInstance().run { IdeInfo(this.companyName, fullApplicationName) }
         )
 
         val json = Json { prettyPrint = false }
