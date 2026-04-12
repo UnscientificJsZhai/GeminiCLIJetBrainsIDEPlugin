@@ -7,8 +7,8 @@ import com.github.unscientificjszhai.geminiclijetbrainsideplugin.model.Workspace
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.CaretEvent
@@ -24,38 +24,66 @@ import com.intellij.openapi.vfs.AsyncFileListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.messages.MessageBusConnection
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+
+private const val CLI_MAX_FILE_COUNT = 10
+private const val CLI_DEBOUNCE_INTERVAL_MS = 50
 
 @OptIn(FlowPreview::class)
 @Service(Service.Level.PROJECT)
-class ContextService(private val project: Project) : NotificationCallbackService<IdeContext>(), Disposable {
+class ContextService(private val project: Project, private val scope: CoroutineScope) :
+    NotificationCallbackService<IdeContext>(), Disposable {
     override var notificationCallback: NotificationCallback<IdeContext>? = null
     private val connection: MessageBusConnection = project.messageBus.connect(this)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val updateFlow = MutableSharedFlow<Unit>(
         replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    private val openFiles = mutableListOf<ContextFile>()
+    private val openFiles: ArrayList<ContextFile> = ArrayList(CLI_MAX_FILE_COUNT)
 
     init {
         subscribeEditorEvents()
+
         scope.launch {
-            updateFlow.debounce(50.milliseconds).collect {
+            readAction {
+                synchronized(openFiles) {
+                    openFiles.addAll(createAllContextFiles())
+                }
+            }
+
+            updateFlow.debounce(CLI_DEBOUNCE_INTERVAL_MS.milliseconds).collect {
                 sendContextUpdate()
             }
         }
     }
 
+    private fun createAllContextFiles(): Sequence<ContextFile> {
+        val fileEditorManager = FileEditorManager.getInstance(project)
+        val openVirtualFiles = fileEditorManager.openFiles
+        val selectedFiles = fileEditorManager.selectedFiles.toSet()
+
+        return openVirtualFiles.run {
+            asSequence().filter { it !in selectedFiles } + asSequence().filter { it in selectedFiles }
+        }.map { file ->
+            val editor = fileEditorManager.getSelectedEditor(file) as? TextEditor
+            val isActive = file in selectedFiles
+            file.toContextFile(editor?.editor, isActive)
+        }
+    }
+
     fun sendContextUpdate() {
         val notificationCallback = this.notificationCallback ?: return
-        val currentFiles = synchronized(openFiles) { openFiles.toList() }
-        thisLogger().warn("openFiles: ${openFiles.size}")
+        val currentFiles = synchronized(openFiles) { openFiles.toList() }.sortedByDescending { fileContext ->
+            fileContext.timestamp
+        }.take(CLI_MAX_FILE_COUNT)
         val context = IdeContext(
             workspaceState = WorkspaceState(
                 openFiles = currentFiles, isTrusted = TrustedProjects.isProjectTrusted(project)
@@ -101,7 +129,7 @@ class ContextService(private val project: Project) : NotificationCallbackService
                     while (iterator.hasNext()) {
                         val file = iterator.next()
                         if (file.path == newFile?.path) {
-                            iterator.set(file.copy(isActive = true))
+                            iterator.set(file.copy(isActive = true, timestamp = System.currentTimeMillis()))
                         } else if (file.isActive) {
                             iterator.set(file.copy(isActive = false, cursor = null, selectedText = null))
                         }
@@ -115,19 +143,9 @@ class ContextService(private val project: Project) : NotificationCallbackService
             object : AsyncFileListener.ChangeApplier {
                 override fun afterVfsChange() {
                     ApplicationManager.getApplication().invokeLater {
-                        val fileEditorManager = FileEditorManager.getInstance(project)
-                        val openVirtualFiles = fileEditorManager.openFiles
-                        val selectedFiles = fileEditorManager.selectedFiles.toSet()
-
-                        val newContextFiles = openVirtualFiles.map { file ->
-                            val editor = fileEditorManager.getSelectedEditor(file) as? TextEditor
-                            val isActive = file in selectedFiles
-                            file.toContextFile(editor?.editor, isActive)
-                        }
-
                         synchronized(openFiles) {
                             openFiles.clear()
-                            openFiles.addAll(newContextFiles)
+                            openFiles.addAll(createAllContextFiles())
                         }
                         emitUpdate()
                     }
@@ -158,7 +176,8 @@ class ContextService(private val project: Project) : NotificationCallbackService
                     cursor = CursorPosition(
                         line = editor.caretModel.logicalPosition.line,
                         character = editor.caretModel.logicalPosition.column
-                    ), selectedText = editor.selectionModel.selectedText
+                    ), selectedText = editor.selectionModel.selectedText,
+                    timestamp = System.currentTimeMillis()
                 )
                 openFiles[index] = updated
                 emitUpdate()

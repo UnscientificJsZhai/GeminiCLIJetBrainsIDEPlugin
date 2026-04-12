@@ -3,7 +3,6 @@ package com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -17,20 +16,22 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import io.modelcontextprotocol.kotlin.sdk.types.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.milliseconds
 
 @Service(Service.Level.PROJECT)
-class McpServer(project: Project) : Disposable {
+class McpServer(project: Project, private val scope: CoroutineScope) : Disposable {
     private var serverInstance: EmbeddedServer<*, *>? = null
     private val discoveryService = project.service<DiscoveryService>()
     private val contextService = project.service<ContextService>()
     private val diffService = project.service<DiffService>()
-    private val logger = thisLogger()
 
     var port: Int = 0
         private set
@@ -85,7 +86,11 @@ class McpServer(project: Project) : Disposable {
         }
 
         onConnect {
-            contextService.sendContextUpdate()
+            scope.launch {
+                // 如果不等待有大概率造成上下文变化前CLI收不到上下文
+                delay(100.milliseconds)
+                contextService.sendContextUpdate()
+            }
         }
     }
 
@@ -138,7 +143,6 @@ class McpServer(project: Project) : Disposable {
 
         runBlocking {
             port = serverInstance!!.engine.resolvedConnectors().first().port
-            logger.warn("MCP Server started on port $port")
             discoveryService.startDiscovery(port)
         }
     }
