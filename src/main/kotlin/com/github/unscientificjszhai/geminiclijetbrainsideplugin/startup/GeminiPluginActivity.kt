@@ -1,7 +1,6 @@
 package com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup
 
 import com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp.McpServer
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 
