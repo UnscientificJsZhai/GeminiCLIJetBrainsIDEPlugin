@@ -1,6 +1,6 @@
 package com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp
 
-import com.github.unscientificjszhai.geminiclijetbrainsideplugin.model.DiffParams
+import com.github.unscientificjszhai.geminiclijetbrainsideplugin.model.DiffNotificationParams
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
@@ -15,8 +15,8 @@ import java.io.File
 import javax.swing.JComponent
 
 @Service(Service.Level.PROJECT)
-class DiffService(private val project: Project): NotificationCallbackService<DiffParams>() {
-    override var notificationCallback: NotificationCallback<DiffParams>? = null
+class DiffService(private val project: Project): NotificationCallbackService<DiffNotificationParams>() {
+    override var notificationCallback: NotificationCallback<DiffNotificationParams>? = null
     private val openDiffDialogs = mutableMapOf<String, DialogWrapper>()
 
     fun openDiff(filePath: String, newContent: String): Boolean {
@@ -72,14 +72,14 @@ class DiffService(private val project: Project): NotificationCallbackService<Dif
 
                     notificationCallback?.callback(
                         "ide/diffAccepted",
-                        DiffParams.DiffAcceptedParams(filePath, finalContent)
+                        DiffNotificationParams(filePath, finalContent)
                     )
                     openDiffDialogs.remove(filePath)
                     super.doOKAction()
                 }
 
                 override fun doCancelAction() {
-                    notificationCallback?.callback("ide/diffRejected", DiffParams.DiffRejectedParams(filePath))
+                    notificationCallback?.callback("ide/diffRejected", DiffNotificationParams(filePath))
                     openDiffDialogs.remove(filePath)
                     super.doCancelAction()
                 }
@@ -96,7 +96,7 @@ class DiffService(private val project: Project): NotificationCallbackService<Dif
         ApplicationManager.getApplication().invokeLater {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE)
             openDiffDialogs.remove(filePath)
-            notificationCallback?.callback("ide/diffRejected", DiffParams.DiffRejectedParams(filePath))
+            notificationCallback?.callback("ide/diffRejected", DiffNotificationParams(filePath))
         }
         return true
     }
