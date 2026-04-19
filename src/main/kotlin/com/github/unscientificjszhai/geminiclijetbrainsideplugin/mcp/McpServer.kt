@@ -3,6 +3,7 @@ package com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @Service(Service.Level.PROJECT)
 class McpServer(project: Project, private val scope: CoroutineScope) : Disposable {
@@ -32,6 +34,8 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
     private val discoveryService = project.service<DiscoveryService>()
     private val contextService = project.service<ContextService>()
     private val diffService = project.service<DiffService>()
+
+    private val logger = thisLogger()
 
     var port: Int = 0
         private set
@@ -139,6 +143,20 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
             mcpStreamableHttp {
                 mcpServer!!
             }
+            launch {
+                while (true) {
+                    delay(30.seconds)
+                    mcpServer?.sessions?.forEach { (_, session) ->
+                        try {
+                            session.transport?.send(
+                                JSONRPCNotification(method = Method.Custom("heartbeat").value, params = null)
+                            )
+                        } catch (e: Exception) {
+                            logger.error("Sending hearbeat error", e)
+                        }
+                    }
+                }
+            }
         }.start(wait = false)
 
         runBlocking {
@@ -153,8 +171,7 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
                 mcpServer?.sessions?.forEach { (_, session) ->
                     session.transport?.send(
                         JSONRPCNotification(
-                            method = Method.Custom(method).value,
-                            params = McpJson.encodeToJsonElement(context)
+                            method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(context)
                         )
                     )
                 }
@@ -166,8 +183,7 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
                 mcpServer?.sessions?.forEach { (_, session) ->
                     session.transport?.send(
                         JSONRPCNotification(
-                            method = Method.Custom(method).value,
-                            params = McpJson.encodeToJsonElement(params)
+                            method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(params)
                         )
                     )
                 }

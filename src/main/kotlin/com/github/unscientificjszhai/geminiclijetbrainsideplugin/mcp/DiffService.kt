@@ -6,6 +6,7 @@ import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -15,9 +16,11 @@ import java.io.File
 import javax.swing.JComponent
 
 @Service(Service.Level.PROJECT)
-class DiffService(private val project: Project): NotificationCallbackService<DiffNotificationParams>() {
+class DiffService(private val project: Project) : NotificationCallbackService<DiffNotificationParams>() {
     override var notificationCallback: NotificationCallback<DiffNotificationParams>? = null
     private val openDiffDialogs = mutableMapOf<String, DialogWrapper>()
+
+    private val logger = thisLogger()
 
     fun openDiff(filePath: String, newContent: String): Boolean {
         val ioFile = File(filePath)
@@ -66,7 +69,7 @@ class DiffService(private val project: Project): NotificationCallbackService<Dif
                                 FileDocumentManager.getInstance().saveDocument(fileDoc)
                             }
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            logger.error("Error while writing document", e)
                         }
                     }
 

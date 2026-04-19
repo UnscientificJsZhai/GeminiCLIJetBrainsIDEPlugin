@@ -10,10 +10,12 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <postStartupActivity implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.GeminiPluginActivity" />
+        <postStartupActivity
+                implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.GeminiPluginActivity"/>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
-        <localTerminalCustomizer implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.terminal.GeminiTerminalCustomizer"/>
+        <localTerminalCustomizer
+                implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.terminal.GeminiTerminalCustomizer"/>
     </extensions>
 </idea-plugin>
