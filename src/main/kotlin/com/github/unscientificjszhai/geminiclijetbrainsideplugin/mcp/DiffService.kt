@@ -60,7 +60,9 @@ class DiffService(private val project: Project) : NotificationCallbackService<Di
                     setOKButtonText("Accept")
                     setCancelButtonText("Reject")
                     // Make it big enough
-                    window.minimumSize = Dimension(1000, 700)
+                    if (!ApplicationManager.getApplication().isHeadlessEnvironment) {
+                        window.minimumSize = Dimension(1000, 700)
+                    }
                 }
 
                 override fun createCenterPanel(): JComponent {
@@ -101,7 +103,9 @@ class DiffService(private val project: Project) : NotificationCallbackService<Di
             }
 
             openDiffDialogs[filePath] = dialog
-            dialog.show()
+            if (!ApplicationManager.getApplication().isHeadlessEnvironment) {
+                dialog.show()
+            }
         }
         return true
     }
