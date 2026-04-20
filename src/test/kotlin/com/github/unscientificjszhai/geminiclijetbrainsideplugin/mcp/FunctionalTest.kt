@@ -107,7 +107,9 @@ class DiffServiceTest : BasePlatformTestCase() {
     }
 
     fun testOpenDiffNonExistentFile() {
-        val success = diffService.openDiff("/non/existent/path", "new content")
-        assertFalse("Should fail for non-existent file", success)
+        val filePath = "/non/existent/path"
+        val success = diffService.openDiff(filePath, "new content")
+        assertTrue("Should succeed for non-existent file", success)
+        diffService.closeDiff(filePath)
     }
 }
