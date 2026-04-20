@@ -26,7 +26,6 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.messages.MessageBusConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
@@ -94,7 +93,6 @@ class ContextService(private val project: Project, private val scope: CoroutineS
 
     override fun dispose() {
         connection.disconnect()
-        scope.cancel()
     }
 
     private fun emitUpdate() {

@@ -4,6 +4,7 @@ import com.github.unscientificjszhai.geminiclijetbrainsideplugin.model.DiffNotif
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
@@ -16,11 +17,22 @@ import java.io.File
 import javax.swing.JComponent
 
 @Service(Service.Level.PROJECT)
-class DiffService(private val project: Project) : NotificationCallbackService<DiffNotificationParams>() {
+class DiffService(private val project: Project) : NotificationCallbackService<DiffNotificationParams>(), Disposable {
     override var notificationCallback: NotificationCallback<DiffNotificationParams>? = null
     private val openDiffDialogs = mutableMapOf<String, DialogWrapper>()
 
     private val logger = thisLogger()
+
+    override fun dispose() {
+        ApplicationManager.getApplication().invokeLater {
+            val dialogs = openDiffDialogs.values.toList()
+            dialogs.forEach { it.close(DialogWrapper.CANCEL_EXIT_CODE) }
+            openDiffDialogs.forEach { (key, _) ->
+                notificationCallback?.callback("ide/diffRejected", DiffNotificationParams(key))
+            }
+            openDiffDialogs.clear()
+        }
+    }
 
     fun openDiff(filePath: String, newContent: String): Boolean {
         val ioFile = File(filePath)

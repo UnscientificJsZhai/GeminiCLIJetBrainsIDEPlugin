@@ -167,33 +167,50 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
 
     private fun setupNotificationListeners() {
         contextService.registerNotificationCallback { method, context ->
-            serverInstance?.application?.launch {
-                mcpServer?.sessions?.forEach { (_, session) ->
-                    session.transport?.send(
-                        JSONRPCNotification(
-                            method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(context)
-                        )
-                    )
+            val server = serverInstance
+            if (server != null) {
+                try {
+                    server.application.launch {
+                        mcpServer?.sessions?.forEach { (_, session) ->
+                            session.transport?.send(
+                                JSONRPCNotification(
+                                    method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(context)
+                                )
+                            )
+                        }
+                    }
+                } catch (_: IllegalStateException) {
+                    // Ignore if server is already stopped
                 }
             }
         }
 
         diffService.registerNotificationCallback { method, params ->
-            serverInstance?.application?.launch {
-                mcpServer?.sessions?.forEach { (_, session) ->
-                    session.transport?.send(
-                        JSONRPCNotification(
-                            method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(params)
-                        )
-                    )
+            val server = serverInstance
+            if (server != null) {
+                try {
+                    server.application.launch {
+                        mcpServer?.sessions?.forEach { (_, session) ->
+                            session.transport?.send(
+                                JSONRPCNotification(
+                                    method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(params)
+                                )
+                            )
+                        }
+                    }
+                } catch (_: IllegalStateException) {
+                    // Ignore if server is already stopped
                 }
             }
         }
     }
 
     override fun dispose() {
+        contextService.notificationCallback = null
+        diffService.notificationCallback = null
         discoveryService.stopDiscovery()
-        serverInstance?.stop(1000, 2000)
+        val server = serverInstance
         serverInstance = null
+        server?.stop(1000, 2000)
     }
 }
