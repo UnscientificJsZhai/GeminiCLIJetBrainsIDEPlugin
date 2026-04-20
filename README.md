@@ -3,8 +3,10 @@
 ![Build](https://github.com/UnscientificJsZhai/GeminiCLIJetBrainsIDEPlugin/workflows/Build/badge.svg)
 
 <!-- Plugin description -->
-JetBrains IDE companion for the Gemini CLI, enabling seamless integration between your editor and Gemini.
-This plugin implements the IDE companion spec, allowing Gemini to interact with your IDE's state and perform actions directly within the editor.
+Enables Gemini CLI to access IDE context, such as active files, editor selections,
+and cursor positions. This plugin provides tools to open and close diff windows
+within the IDE, allowing users to review and confirm suggested code modifications
+through an interactive interface.
 
 Gemini CLI 的 JetBrains IDE 插件。
 提供 [spec](https://github.com/google-gemini/gemini-cli/blob/main/docs/ide-integration/ide-companion-spec.md) 中的功能。

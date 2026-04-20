@@ -18,4 +18,10 @@
         <localTerminalCustomizer
                 implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.terminal.GeminiTerminalCustomizer"/>
     </extensions>
+    <description>
+        Enables Gemini CLI to access IDE context, such as active files, editor selections,
+        and cursor positions. This plugin provides tools to open and close diff windows
+        within the IDE, allowing users to review and confirm suggested code modifications
+        through an interactive interface.
+    </description>
 </idea-plugin>
