@@ -103,7 +103,7 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
 
         // Initialize MCP Server
         val implementation = Implementation(
-            name = "JetBrains IDE Plugin", version = "1.0.0"
+            name = "JetBrains IDE Plugin", version = "1.0.1"
         )
 
         mcpServer = createMcpServer(implementation)

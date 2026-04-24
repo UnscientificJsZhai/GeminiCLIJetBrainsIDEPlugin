@@ -87,18 +87,6 @@ class DiffService(private val project: Project) : NotificationCallbackService<Di
                         val document = newDiffContent.document
                         val finalContent = document.text
 
-                        ApplicationManager.getApplication().runWriteAction {
-                            try {
-                                val fileDoc = FileDocumentManager.getInstance().getDocument(virtualFile)
-                                if (fileDoc != null) {
-                                    fileDoc.setText(finalContent)
-                                    FileDocumentManager.getInstance().saveDocument(fileDoc)
-                                }
-                            } catch (e: Exception) {
-                                logger.error("Error while writing document", e)
-                            }
-                        }
-
                         notificationCallback?.callback(
                             "ide/diffAccepted",
                             DiffNotificationParams(filePath, finalContent)
