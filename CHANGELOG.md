@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Exclude terminal windows and other non-project file windows from the context.
+
 ## [1.0.1] - 2026-04-24
 
 ### Fixed

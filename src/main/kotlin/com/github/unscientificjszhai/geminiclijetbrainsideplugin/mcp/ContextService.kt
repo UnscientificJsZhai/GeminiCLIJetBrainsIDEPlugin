@@ -66,7 +66,9 @@ class ContextService(private val project: Project, private val scope: CoroutineS
 
     private fun createAllContextFiles(): Sequence<ContextFile> {
         val fileEditorManager = FileEditorManager.getInstance(project)
-        val openVirtualFiles = fileEditorManager.openFiles
+        val openVirtualFiles = fileEditorManager.openFiles.filter {
+            it.path.startsWith(project.basePath ?: "")
+        }
         val selectedFiles = fileEditorManager.selectedFiles.toSet()
 
         return openVirtualFiles.run {
@@ -105,7 +107,8 @@ class ContextService(private val project: Project, private val scope: CoroutineS
         connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
             override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
                 val editor = source.getSelectedEditor(file) as? TextEditor
-                val contextFile = file.toContextFile(editor?.editor, isActive = false)
+                val contextFile = file.toContextFile(editor?.editor, isActive = true)
+                if(!file.path.startsWith(project.basePath ?: "")) return
                 synchronized(openFiles) {
                     openFiles.removeAll { it.path == file.path }
                     openFiles.add(contextFile)
