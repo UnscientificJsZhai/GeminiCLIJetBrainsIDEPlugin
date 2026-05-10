@@ -93,7 +93,6 @@ class McpServer(private val project: Project, private val scope: CoroutineScope)
             name = "closeDiff", description = "Closes a diff view", inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("filePath", buildJsonObject { put("type", "string") })
-                    put("suppressNotification", buildJsonObject { put("type", "boolean") })
                 }, required = listOf("filePath")
             )
         ) { args ->

@@ -18,8 +18,10 @@ import com.intellij.openapi.editor.event.SelectionListener
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.AsyncFileListener
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -67,14 +69,14 @@ class ContextService(private val project: Project, private val scope: CoroutineS
     private fun createAllContextFiles(): Sequence<ContextFile> {
         val fileEditorManager = FileEditorManager.getInstance(project)
         val openVirtualFiles = fileEditorManager.openFiles.filter {
-            it.path.startsWith(project.basePath ?: "")
+            it.isInProject()
         }
         val selectedFiles = fileEditorManager.selectedFiles.toSet()
 
         return openVirtualFiles.run {
             asSequence().filter { it !in selectedFiles } + asSequence().filter { it in selectedFiles }
         }.map { file ->
-            val editor = fileEditorManager.getSelectedEditor(file) as? TextEditor
+            val editor = fileEditorManager.findTextEditor(file)
             val isActive = file in selectedFiles
             file.toContextFile(editor?.editor, isActive)
         }
@@ -93,6 +95,21 @@ class ContextService(private val project: Project, private val scope: CoroutineS
         notificationCallback.callback("ide/contextUpdate", context)
     }
 
+    private fun refreshOpenFiles() {
+        val currentFiles = createAllContextFiles().toList()
+        synchronized(openFiles) {
+            val existingFilesByPath = openFiles.associateBy { it.path }
+            val refreshedFiles = currentFiles.map { currentFile ->
+                existingFilesByPath[currentFile.path]?.let { existingFile ->
+                    currentFile.copy(timestamp = existingFile.timestamp)
+                } ?: currentFile
+            }
+
+            openFiles.clear()
+            openFiles.addAll(refreshedFiles)
+        }
+    }
+
     override fun dispose() {
         connection.disconnect()
     }
@@ -106,9 +123,9 @@ class ContextService(private val project: Project, private val scope: CoroutineS
     private fun subscribeEditorEvents() {
         connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
             override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-                val editor = source.getSelectedEditor(file) as? TextEditor
+                val editor = source.findTextEditor(file)
                 val contextFile = file.toContextFile(editor?.editor, isActive = true)
-                if(!file.path.startsWith(project.basePath ?: "")) return
+                if (!file.isInProject()) return
                 synchronized(openFiles) {
                     openFiles.removeAll { it.path == file.path }
                     openFiles.add(contextFile)
@@ -144,10 +161,7 @@ class ContextService(private val project: Project, private val scope: CoroutineS
             object : AsyncFileListener.ChangeApplier {
                 override fun afterVfsChange() {
                     ApplicationManager.getApplication().invokeLater {
-                        synchronized(openFiles) {
-                            openFiles.clear()
-                            openFiles.addAll(createAllContextFiles())
-                        }
+                        refreshOpenFiles()
                         emitUpdate()
                     }
                 }
@@ -194,5 +208,18 @@ class ContextService(private val project: Project, private val scope: CoroutineS
                 )
             }, selectedText = editor?.selectionModel?.selectedText
         )
+    }
+
+    private fun FileEditorManager.findTextEditor(file: VirtualFile): TextEditor? {
+        return getEditors(file).firstTextEditor()
+    }
+
+    private fun Array<FileEditor>.firstTextEditor(): TextEditor? {
+        return firstOrNull { it is TextEditor } as? TextEditor
+    }
+
+    private fun VirtualFile.isInProject(): Boolean {
+        return ProjectFileIndex.getInstance(project).isInContent(this)
+                || project.basePath?.let { path.startsWith(it) } == true
     }
 }

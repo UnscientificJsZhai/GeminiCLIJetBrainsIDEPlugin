@@ -67,6 +67,32 @@ class ContextServiceTest : BasePlatformTestCase() {
         val activeFileWithSelection = updatedContext?.workspaceState?.openFiles?.find { it.isActive }
         assertEquals("line2", activeFileWithSelection?.selectedText)
     }
+
+    fun testSendContextUpdatePreservesRecentFileOrder() {
+        val file1 = myFixture.addFileToProject("File1.kt", "fun one() {}").virtualFile
+        val file2 = myFixture.addFileToProject("File2.kt", "fun two() {}").virtualFile
+        var updatedContext: IdeContext? = null
+
+        contextService.registerNotificationCallback { _, context ->
+            updatedContext = context
+        }
+
+        myFixture.openFileInEditor(file1)
+        contextService.sendContextUpdate()
+
+        myFixture.openFileInEditor(file2)
+        contextService.sendContextUpdate()
+
+        myFixture.openFileInEditor(file1)
+        myFixture.editor.caretModel.moveToOffset("fun ".length)
+        contextService.sendContextUpdate()
+
+        contextService.sendContextUpdate()
+
+        val openFiles = updatedContext?.workspaceState?.openFiles ?: emptyList()
+        assertTrue(openFiles.size >= 2)
+        assertTrue(openFiles[0].path.endsWith("File1.kt"))
+    }
 }
 
 class DiscoveryServiceTest : BasePlatformTestCase() {
