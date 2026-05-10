@@ -8,6 +8,8 @@ import org.jetbrains.plugins.terminal.LocalTerminalCustomizer
 
 class GeminiTerminalCustomizer : LocalTerminalCustomizer() {
 
+    private val logger = thisLogger()
+
     override fun customizeCommandAndEnvironment(
         project: Project,
         workingDirectory: String?,
@@ -19,9 +21,9 @@ class GeminiTerminalCustomizer : LocalTerminalCustomizer() {
 
         if (port in 1..65535) {
             envs["GEMINI_CLI_IDE_SERVER_PORT"] = port.toString()
-            thisLogger().info("Injected GEMINI_CLI_IDE_SERVER_PORT=$port into terminal environment")
+            logger.info("Injected GEMINI_CLI_IDE_SERVER_PORT=$port into terminal environment")
         } else {
-            thisLogger().warn("McpServer port is null, cannot inject environment variable")
+            logger.warn("McpServer port is null, cannot inject environment variable")
         }
 
         return command

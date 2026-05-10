@@ -7,11 +7,12 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
-    <resource-bundle>messages.MyBundle</resource-bundle>
+    <resource-bundle>messages.PortBindingNotification</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
         <postStartupActivity
                 implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.GeminiPluginActivity"/>
+        <notificationGroup id="Gemini CLI Companion" displayType="BALLOON"/>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">

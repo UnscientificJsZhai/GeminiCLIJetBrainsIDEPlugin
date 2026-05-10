@@ -1,5 +1,7 @@
 package com.github.unscientificjszhai.geminiclijetbrainsideplugin.mcp
 
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -17,19 +19,24 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import io.modelcontextprotocol.kotlin.sdk.types.*
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.net.BindException
+import java.net.ServerSocket
+import java.text.MessageFormat
+import java.util.*
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 @Service(Service.Level.PROJECT)
-class McpServer(project: Project, private val scope: CoroutineScope) : Disposable {
+class McpServer(private val project: Project, private val scope: CoroutineScope) : Disposable {
     private var serverInstance: EmbeddedServer<*, *>? = null
     private val discoveryService = project.service<DiscoveryService>()
     private val contextService = project.service<ContextService>()
@@ -41,6 +48,18 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
         private set
 
     private var mcpServer: Server? = null
+
+    private var preReservedSocket: ServerSocket? = null
+
+    init {
+        try {
+            val socket = ServerSocket(0)
+            preReservedSocket = socket
+            port = socket.localPort
+        } catch (e: Exception) {
+            logger.warn("Failed to pre-reserve port", e)
+        }
+    }
 
     private fun createMcpServer(implementation: Implementation) = Server(
         implementation, ServerOptions(
@@ -98,6 +117,7 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
         }
     }
 
+    @Synchronized
     fun start() {
         if (serverInstance != null) return
 
@@ -111,59 +131,101 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
         // Setup notification listeners
         setupNotificationListeners()
 
-        serverInstance = embeddedServer(CIO, port = 0) {
-            install(CORS) {
-                anyHost()
-                allowMethod(HttpMethod.Options)
-                allowMethod(HttpMethod.Get)
-                allowMethod(HttpMethod.Post)
-                allowMethod(HttpMethod.Delete)
-                allowNonSimpleContentTypes = true
-                allowHeader("Mcp-Session-Id")
-                allowHeader("Mcp-Protocol-Version")
-                allowHeader(HttpHeaders.Authorization)
-                exposeHeader("Mcp-Session-Id")
-                exposeHeader("Mcp-Protocol-Version")
-            }
-            install(ContentNegotiation) {
-                json(McpJson)
-            }
+        // Close pre-reserved socket right before starting Ktor
+        preReservedSocket?.close()
+        preReservedSocket = null
 
-            install(Authentication) {
-                bearer("Bearer") {
-                    authenticate {
-                        if (it.token == discoveryService.authToken) {
-                            UserIdPrincipal("Bearer")
-                        } else {
-                            null
-                        }
-                    }
-                }
-            }
-            mcpStreamableHttp {
-                mcpServer!!
-            }
-            launch {
-                while (true) {
-                    delay(30.seconds)
-                    mcpServer?.sessions?.forEach { (_, session) ->
-                        try {
-                            session.transport?.send(
-                                JSONRPCNotification(method = Method.Custom("heartbeat").value, params = null)
-                            )
-                        } catch (e: Exception) {
-                            logger.error("Sending hearbeat error", e)
-                        }
-                    }
-                }
-            }
-        }.start(wait = false)
+        val server = createServer(port)
+        serverInstance = server
+        server.start(wait = false)
 
-        runBlocking {
-            port = serverInstance!!.engine.resolvedConnectors().first().port
-            discoveryService.startDiscovery(port)
+        discoveryService.startDiscovery(port)
+    }
+
+    @Volatile
+    private var retriedCreateServer = false
+    private val bindExceptionHandler = CoroutineExceptionHandler { _, exception ->
+        if (exception is BindException && !retriedCreateServer) {
+            retriedCreateServer = true
+            this.scope.launch {
+                logger.warn("Failed to bind to pre-reserved port $port, retrying with port 0")
+                discoveryService.stopDiscovery()
+                serverInstance?.stop()
+                val oldPort = port
+                val server = createServer(0, retry = false)
+                serverInstance = server
+                server.start(wait = false)
+                port = server.engine.resolvedConnectors().first().port
+                discoveryService.startDiscovery(port)
+                notifyPreRegisteredPortBindingFailed(oldPort, port)
+            }
         }
     }
+
+    private fun createServer(targetPort: Int, retry: Boolean = true): EmbeddedServer<*, *> = scope.embeddedServer(
+        CIO, port = targetPort, parentCoroutineContext = if (retry) bindExceptionHandler else EmptyCoroutineContext,
+    ) {
+        install(CORS) {
+            anyHost()
+            allowMethod(HttpMethod.Options)
+            allowMethod(HttpMethod.Get)
+            allowMethod(HttpMethod.Post)
+            allowMethod(HttpMethod.Delete)
+            allowNonSimpleContentTypes = true
+            allowHeader("Mcp-Session-Id")
+            allowHeader("Mcp-Protocol-Version")
+            allowHeader(HttpHeaders.Authorization)
+            exposeHeader("Mcp-Session-Id")
+            exposeHeader("Mcp-Protocol-Version")
+        }
+        install(ContentNegotiation) {
+            json(McpJson)
+        }
+
+        install(Authentication) {
+            bearer("Bearer") {
+                authenticate {
+                    if (it.token == discoveryService.authToken) {
+                        UserIdPrincipal("Bearer")
+                    } else {
+                        null
+                    }
+                }
+            }
+        }
+        mcpStreamableHttp {
+            mcpServer!!
+        }
+        launch {
+            while (true) {
+                delay(30.seconds)
+                mcpServer?.sessions?.forEach { (_, session) ->
+                    try {
+                        session.transport?.send(
+                            JSONRPCNotification(method = Method.Custom("heartbeat").value, params = null)
+                        )
+                    } catch (e: Exception) {
+                        logger.warn("Sending heartbeat error", e)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun notifyPreRegisteredPortBindingFailed(oldPort: Int, newPort: Int) {
+        logger.warn("Port changed from $oldPort to $newPort due to binding failure")
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("Gemini CLI Companion")
+            .createNotification(
+                message("notification.port.binding.failed.title"),
+                message("notification.port.binding.failed.content", oldPort, newPort),
+                NotificationType.ERROR
+            )
+            .notify(project)
+    }
+
+    private fun message(key: String, vararg params: Any): String =
+        MessageFormat.format(ResourceBundle.getBundle("messages.PortBindingNotification").getString(key), *params)
 
     private fun setupNotificationListeners() {
         contextService.registerNotificationCallback { method, context ->
@@ -172,11 +234,16 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
                 try {
                     server.application.launch {
                         mcpServer?.sessions?.forEach { (_, session) ->
-                            session.transport?.send(
-                                JSONRPCNotification(
-                                    method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(context)
+                            try {
+                                session.transport?.send(
+                                    JSONRPCNotification(
+                                        method = Method.Custom(method).value,
+                                        params = McpJson.encodeToJsonElement(context)
+                                    )
                                 )
-                            )
+                            } catch (e: Exception) {
+                                logger.warn("Sending context message error", e)
+                            }
                         }
                     }
                 } catch (_: IllegalStateException) {
@@ -191,11 +258,16 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
                 try {
                     server.application.launch {
                         mcpServer?.sessions?.forEach { (_, session) ->
-                            session.transport?.send(
-                                JSONRPCNotification(
-                                    method = Method.Custom(method).value, params = McpJson.encodeToJsonElement(params)
+                            try {
+                                session.transport?.send(
+                                    JSONRPCNotification(
+                                        method = Method.Custom(method).value,
+                                        params = McpJson.encodeToJsonElement(params)
+                                    )
                                 )
-                            )
+                            } catch (e: Exception) {
+                                logger.warn("Sending diff message error", e)
+                            }
                         }
                     }
                 } catch (_: IllegalStateException) {
@@ -209,6 +281,7 @@ class McpServer(project: Project, private val scope: CoroutineScope) : Disposabl
         contextService.notificationCallback = null
         diffService.notificationCallback = null
         discoveryService.stopDiscovery()
+        preReservedSocket?.close()
         val server = serverInstance
         serverInstance = null
         server?.stop(1000, 2000)

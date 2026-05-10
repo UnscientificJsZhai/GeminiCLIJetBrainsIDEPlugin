@@ -20,7 +20,7 @@ class DiscoveryService(private val project: Project) : Disposable {
     private val pid = ProcessHandle.current().pid()
 
     fun startDiscovery(port: Int) {
-        thisLogger().warn("Starting discovery for project: ${project.name}")
+        thisLogger().info("Starting discovery for project: ${project.name}")
         currentPort = port
         updateDiscoveryFile()
     }
@@ -36,7 +36,7 @@ class DiscoveryService(private val project: Project) : Disposable {
     }
 
     private fun updateDiscoveryFile() {
-        thisLogger().warn("Updating discovery for project: ${project.name}")
+        thisLogger().info("Updating discovery for project: ${project.name}")
         val port = currentPort ?: return
 
         val workspacePath = ProjectRootManager.getInstance(project).contentRoots.let { contentRoots ->
@@ -58,7 +58,7 @@ class DiscoveryService(private val project: Project) : Disposable {
         )
 
         val json = Json { prettyPrint = false }
-        thisLogger().warn("Discovery file: $file")
+        thisLogger().info("Discovery file: $file")
         file.writeText(json.encodeToString(info))
         file.setReadable(true, true)
         file.setWritable(true, true)

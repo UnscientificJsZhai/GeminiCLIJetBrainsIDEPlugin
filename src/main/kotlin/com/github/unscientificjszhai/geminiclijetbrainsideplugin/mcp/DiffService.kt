@@ -136,7 +136,7 @@ class DiffService(private val project: Project) : NotificationCallbackService<Di
                                 // Refresh file system to show the new file
                                 VfsUtil.markDirtyAndRefresh(false, true, true, ioFile)
                             } catch (e: Exception) {
-                                logger.error("Error while creating new file", e)
+                                logger.warn("Error while creating new file", e)
                             }
                         }
 
