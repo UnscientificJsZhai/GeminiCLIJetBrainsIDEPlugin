@@ -39,14 +39,16 @@ dependencies {
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-slf4j")
     }
 
-    implementation("io.ktor:ktor-server-sse:3.3.1") { excludeCoroutines() }
+    implementation(libs.ktor.server.sse) { excludeCoroutines() }
     implementation(libs.ktor.server.core) { excludeCoroutines() }
-    implementation(libs.ktor.server.netty) { excludeCoroutines() }
+    implementation(libs.ktor.server.cio) { excludeCoroutines() }
     implementation(libs.ktor.server.cors) { excludeCoroutines() }
     implementation(libs.ktor.server.auth) { excludeCoroutines() }
     implementation(libs.ktor.server.content.negotiation) { excludeCoroutines() }
     implementation(libs.ktor.serialization.kotlinx.json) { excludeCoroutines() }
-    implementation(libs.mcp.sdk) { excludeCoroutines() }
+    implementation(libs.mcp.sdk) {
+        excludeCoroutines()
+    }
 
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.kotlinx.serialization.json)
