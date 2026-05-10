@@ -5,6 +5,9 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URI
 
 class ContextServiceTest : BasePlatformTestCase() {
 
@@ -138,4 +141,93 @@ class DiffServiceTest : BasePlatformTestCase() {
         assertTrue("Should succeed for non-existent file", success)
         diffService.closeDiff(filePath)
     }
+}
+
+class McpServerAuthenticationTest : BasePlatformTestCase() {
+    private lateinit var mcpServer: McpServer
+    private lateinit var discoveryService: DiscoveryService
+
+    override fun setUp() {
+        super.setUp()
+        mcpServer = project.service<McpServer>()
+        discoveryService = project.service<DiscoveryService>()
+        mcpServer.start()
+    }
+
+    override fun tearDown() {
+        try {
+            mcpServer.dispose()
+        } finally {
+            super.tearDown()
+        }
+    }
+
+    fun testRejectsRequestWithoutBearerToken() {
+        val response = requestMcp()
+
+        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, response.statusCode)
+        assertEquals("Bearer", response.wwwAuthenticate)
+    }
+
+    fun testRejectsRequestWithInvalidBearerToken() {
+        val response = requestMcp("Bearer wrong-token")
+
+        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, response.statusCode)
+        assertEquals("Bearer", response.wwwAuthenticate)
+    }
+
+    fun testAllowsRequestWithValidBearerToken() {
+        val response = requestMcp("Bearer ${discoveryService.authToken}")
+
+        assertFalse(response.statusCode == HttpURLConnection.HTTP_UNAUTHORIZED)
+        assertNull(response.wwwAuthenticate)
+    }
+
+    fun testBearerSchemeIsCaseInsensitive() {
+        val response = requestMcp("bearer ${discoveryService.authToken}")
+
+        assertFalse(response.statusCode == HttpURLConnection.HTTP_UNAUTHORIZED)
+        assertNull(response.wwwAuthenticate)
+    }
+
+    private fun requestMcp(authorization: String? = null): HttpResponse {
+        var lastException: IOException? = null
+        repeat(50) {
+            try {
+                return openMcpConnection(authorization).use { connection ->
+                    HttpResponse(
+                        statusCode = connection.responseCode,
+                        wwwAuthenticate = connection.getHeaderField("WWW-Authenticate"),
+                    )
+                }
+            } catch (e: IOException) {
+                lastException = e
+                Thread.sleep(100)
+            }
+        }
+
+        throw AssertionError("MCP server did not respond on port ${mcpServer.port}", lastException)
+    }
+
+    private fun openMcpConnection(authorization: String?): HttpURLConnection {
+        val connection = URI("http://127.0.0.1:${mcpServer.port}/mcp").toURL().openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 500
+        connection.readTimeout = 500
+        authorization?.let { connection.setRequestProperty("Authorization", it) }
+        return connection
+    }
+
+    private inline fun <T> HttpURLConnection.use(block: (HttpURLConnection) -> T): T {
+        try {
+            return block(this)
+        } finally {
+            disconnect()
+        }
+    }
+
+    private data class HttpResponse(
+        val statusCode: Int,
+        val wwwAuthenticate: String?,
+    )
 }

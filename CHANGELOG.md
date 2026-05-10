@@ -8,6 +8,7 @@
 
 - Exclude terminal windows and other non-project file windows from the context.
 - Fixed an issue where environment variables could not be injected into the shell process if a terminal window was already open when the project started.
+- Fixed the issue of invalid authentication.
 
 ## [1.0.1] - 2026-04-24
 

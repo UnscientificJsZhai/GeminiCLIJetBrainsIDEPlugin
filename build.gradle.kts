@@ -43,7 +43,6 @@ dependencies {
     implementation(libs.ktor.server.core) { excludeCoroutines() }
     implementation(libs.ktor.server.cio) { excludeCoroutines() }
     implementation(libs.ktor.server.cors) { excludeCoroutines() }
-    implementation(libs.ktor.server.auth) { excludeCoroutines() }
     implementation(libs.ktor.server.content.negotiation) { excludeCoroutines() }
     implementation(libs.ktor.serialization.kotlinx.json) { excludeCoroutines() }
     implementation(libs.mcp.sdk) {

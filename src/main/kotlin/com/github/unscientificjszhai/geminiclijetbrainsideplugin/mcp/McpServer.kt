@@ -8,13 +8,15 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import io.ktor.http.*
+import io.ktor.http.auth.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.response.*
+import io.ktor.util.pipeline.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
@@ -50,6 +52,28 @@ class McpServer(private val project: Project, private val scope: CoroutineScope)
     private var mcpServer: Server? = null
 
     private var preReservedSocket: ServerSocket? = null
+
+    private val bearerAuthenticationHook =
+        object : Hook<suspend PipelineContext<Unit, PipelineCall>.(PipelineCall) -> Unit> {
+            override fun install(
+                pipeline: ApplicationCallPipeline,
+                handler: suspend PipelineContext<Unit, PipelineCall>.(PipelineCall) -> Unit,
+            ) {
+                pipeline.intercept(ApplicationCallPipeline.Plugins) {
+                    handler(call)
+                }
+            }
+        }
+
+    private val bearerAuthenticationPlugin = createApplicationPlugin("McpBearerAuthentication") {
+        on(bearerAuthenticationHook) { call ->
+            if (call.hasValidBearerToken()) return@on
+
+            call.response.headers.append(HttpHeaders.WWWAuthenticate, "Bearer")
+            call.respond(HttpStatusCode.Unauthorized)
+            finish()
+        }
+    }
 
     init {
         try {
@@ -181,17 +205,7 @@ class McpServer(private val project: Project, private val scope: CoroutineScope)
             json(McpJson)
         }
 
-        install(Authentication) {
-            bearer("Bearer") {
-                authenticate {
-                    if (it.token == discoveryService.authToken) {
-                        UserIdPrincipal("Bearer")
-                    } else {
-                        null
-                    }
-                }
-            }
-        }
+        install(bearerAuthenticationPlugin)
         mcpStreamableHttp {
             mcpServer!!
         }
@@ -225,6 +239,14 @@ class McpServer(private val project: Project, private val scope: CoroutineScope)
 
     private fun message(key: String, vararg params: Any): String =
         MessageFormat.format(ResourceBundle.getBundle("messages.PortBindingNotification").getString(key), *params)
+
+    private fun ApplicationCall.hasValidBearerToken(): Boolean {
+        val authorizationHeader = request.headers[HttpHeaders.Authorization] ?: return false
+        val authHeader = runCatching { parseAuthorizationHeader(authorizationHeader) }.getOrNull()
+        return authHeader is HttpAuthHeader.Single &&
+                authHeader.authScheme.equals("Bearer", ignoreCase = true) &&
+                authHeader.blob == discoveryService.authToken
+    }
 
     private fun setupNotificationListeners() {
         contextService.registerNotificationCallback { method, context ->
