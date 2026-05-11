@@ -12,7 +12,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <postStartupActivity
                 implementation="com.github.unscientificjszhai.geminiclijetbrainsideplugin.startup.GeminiPluginActivity"/>
-        <notificationGroup id="Gemini CLI Companion" displayType="BALLOON"/>
+        <notificationGroup id="Gemini CLI Companion" displayType="BALLOON" key="notification.group.gemini.cli.companion"/>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
