@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-05-12
+
 ### Fixed
 
 - Exclude terminal windows and other non-project file windows from the context.
@@ -22,6 +24,7 @@
 
 - Basic functions in [Spec](https://github.com/google-gemini/gemini-cli/blob/main/docs/ide-integration/ide-companion-spec.md).
 
-[Unreleased]: https://github.com/UnscientificJsZhai/GeminiCLIJetBrainsIDEPlugin/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/UnscientificJsZhai/GeminiCLIJetBrainsIDEPlugin/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/UnscientificJsZhai/GeminiCLIJetBrainsIDEPlugin/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/UnscientificJsZhai/GeminiCLIJetBrainsIDEPlugin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/UnscientificJsZhai/GeminiCLIJetBrainsIDEPlugin/commits/v1.0.0
