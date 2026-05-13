@@ -96,6 +96,34 @@ class ContextServiceTest : BasePlatformTestCase() {
         assertTrue(openFiles.size >= 2)
         assertTrue(openFiles[0].path.endsWith("File1.kt"))
     }
+
+    fun testScheduleRefreshIfOpenForOpenFile() {
+        val file = myFixture.addFileToProject("RefreshMe.kt", "fun refreshMe() {}").virtualFile
+        myFixture.openFileInEditor(file)
+
+        contextService.scheduleRefreshIfOpen(file.path)
+
+        Thread.sleep(600)
+    }
+
+    fun testScheduleRefreshIfOpenForUnopenedFileDoesNotChangeContext() {
+        val openFile = myFixture.addFileToProject("OpenFile.kt", "fun openFile() {}").virtualFile
+        val unopenedFile = myFixture.addFileToProject("UnopenedFile.kt", "fun unopenedFile() {}").virtualFile
+        var updatedContext: IdeContext? = null
+
+        contextService.registerNotificationCallback { _, context ->
+            updatedContext = context
+        }
+
+        myFixture.openFileInEditor(openFile)
+        contextService.sendContextUpdate()
+        val before = updatedContext
+
+        contextService.scheduleRefreshIfOpen(unopenedFile.path)
+        contextService.sendContextUpdate()
+
+        assertEquals(before, updatedContext)
+    }
 }
 
 class DiscoveryServiceTest : BasePlatformTestCase() {

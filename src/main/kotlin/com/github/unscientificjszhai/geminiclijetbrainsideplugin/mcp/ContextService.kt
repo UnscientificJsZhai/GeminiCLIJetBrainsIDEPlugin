@@ -15,20 +15,18 @@ import com.intellij.openapi.editor.event.CaretEvent
 import com.intellij.openapi.editor.event.CaretListener
 import com.intellij.openapi.editor.event.SelectionEvent
 import com.intellij.openapi.editor.event.SelectionListener
-import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.fileEditor.FileEditorManagerEvent
-import com.intellij.openapi.fileEditor.FileEditorManagerListener
-import com.intellij.openapi.fileEditor.FileEditor
-import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.AsyncFileListener
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.messages.MessageBusConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
@@ -36,6 +34,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 private const val CLI_MAX_FILE_COUNT = 10
 private const val CLI_DEBOUNCE_INTERVAL_MS = 50
+private const val CLI_DIFF_ACCEPT_REFRESH_DELAY_MS = 500
 
 @OptIn(FlowPreview::class)
 @Service(Service.Level.PROJECT)
@@ -93,6 +92,17 @@ class ContextService(private val project: Project, private val scope: CoroutineS
             )
         )
         notificationCallback.callback("ide/contextUpdate", context)
+    }
+
+    fun scheduleRefreshIfOpen(filePath: String) {
+        if (openFiles.none { it.path == filePath }) return
+
+        val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath) ?: return
+        scope.launch {
+            delay(CLI_DIFF_ACCEPT_REFRESH_DELAY_MS.milliseconds)
+            if (project.isDisposed || !virtualFile.isValid) return@launch
+            virtualFile.refresh(true, false)
+        }
     }
 
     private fun refreshOpenFiles() {

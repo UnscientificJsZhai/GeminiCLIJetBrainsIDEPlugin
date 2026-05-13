@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Once the changes are accepted, the extension will proactively attempt to refresh the file.
+
 ## [1.0.2] - 2026-05-12
 
 ### Fixed
