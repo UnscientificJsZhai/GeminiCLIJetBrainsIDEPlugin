@@ -8,3 +8,4 @@ build
 
 # AI Agent
 /.gemini
+/.codex
